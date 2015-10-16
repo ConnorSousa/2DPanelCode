@@ -8,7 +8,7 @@
 #include <Eigen/Dense>
 
 using namespace Eigen;
-
+//Hello
 class Geom{
 public:
     void findControlPts(VectorXd &x, VectorXd &y, VectorXd &xControlPt, VectorXd &yControlPt, VectorXd &dl, int &n);
