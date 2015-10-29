@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		012B7C241AE5E65D0064EF8A /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 012B7C231AE5E65D0064EF8A /* main.cpp */; };
+		018882F11BD4739A00DE70C4 /* SourceDoublet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 018882EF1BD4739A00DE70C4 /* SourceDoublet.cpp */; };
+		018882F41BD5438800DE70C4 /* MatlabOutput.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 018882F21BD5438800DE70C4 /* MatlabOutput.cpp */; };
+		018882F71BD589AF00DE70C4 /* Wake.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 018882F51BD589AF00DE70C4 /* Wake.cpp */; };
 		01A594D21BCF503B00168E5A /* Geom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 01A594D01BCF503B00168E5A /* Geom.cpp */; };
 /* End PBXBuildFile section */
 
@@ -35,6 +38,12 @@
 /* Begin PBXFileReference section */
 		012B7C201AE5E65D0064EF8A /* 2DPanelCode */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = 2DPanelCode; sourceTree = BUILT_PRODUCTS_DIR; };
 		012B7C231AE5E65D0064EF8A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		018882EF1BD4739A00DE70C4 /* SourceDoublet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SourceDoublet.cpp; path = ../../SourceDoublet.cpp; sourceTree = "<group>"; };
+		018882F01BD4739A00DE70C4 /* SourceDoublet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SourceDoublet.h; path = ../../SourceDoublet.h; sourceTree = "<group>"; };
+		018882F21BD5438800DE70C4 /* MatlabOutput.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MatlabOutput.cpp; sourceTree = "<group>"; };
+		018882F31BD5438800DE70C4 /* MatlabOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MatlabOutput.h; sourceTree = "<group>"; };
+		018882F51BD589AF00DE70C4 /* Wake.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Wake.cpp; sourceTree = "<group>"; };
+		018882F61BD589AF00DE70C4 /* Wake.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Wake.h; sourceTree = "<group>"; };
 		01A594D01BCF503B00168E5A /* Geom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Geom.cpp; sourceTree = "<group>"; };
 		01A594D11BCF503B00168E5A /* Geom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Geom.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -70,8 +79,14 @@
 			isa = PBXGroup;
 			children = (
 				012B7C231AE5E65D0064EF8A /* main.cpp */,
+				018882F51BD589AF00DE70C4 /* Wake.cpp */,
+				018882F61BD589AF00DE70C4 /* Wake.h */,
+				018882F21BD5438800DE70C4 /* MatlabOutput.cpp */,
+				018882F31BD5438800DE70C4 /* MatlabOutput.h */,
 				01A594D01BCF503B00168E5A /* Geom.cpp */,
 				01A594D11BCF503B00168E5A /* Geom.h */,
+				018882EF1BD4739A00DE70C4 /* SourceDoublet.cpp */,
+				018882F01BD4739A00DE70C4 /* SourceDoublet.h */,
 			);
 			path = 2DPanelCode;
 			sourceTree = "<group>";
@@ -128,8 +143,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				018882F11BD4739A00DE70C4 /* SourceDoublet.cpp in Sources */,
 				012B7C241AE5E65D0064EF8A /* main.cpp in Sources */,
 				01A594D21BCF503B00168E5A /* Geom.cpp in Sources */,
+				018882F41BD5438800DE70C4 /* MatlabOutput.cpp in Sources */,
+				018882F71BD589AF00DE70C4 /* Wake.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

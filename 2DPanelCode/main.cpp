@@ -13,199 +13,149 @@
 #include <cmath>
 #include <Eigen/Dense>
 #include "Geom.h"
+#include "SourceDoublet.h"
+#include "MatlabOutput.h"
+#include "Wake.h"
 
 using namespace std;
 using namespace Eigen;
-const double pi = 3.14159265;
-
-
-void MATLABoutput(VectorXd &x, VectorXd &y,const double &alpha, VectorXd &xControlPt, VectorXd &yControlPt, VectorXd &theta, int &numpts, int &n, MatrixXd &A, MatrixXd &b, MatrixXd &c, VectorXd &dl,VectorXd &Qtan, VectorXd &QinfTan, VectorXd &delCl,  VectorXd &doublets, VectorXd &RHS,VectorXd &Cp, VectorXd &sigma);
-
-//================================================================================
-
-void getCoords(VectorXd &x, VectorXd &y, int &numpts){
-    ifstream thefile;
-    thefile.open("/Users/C_Man/Desktop/Thesis/2DPanelCode/4412.txt");
-    //thefile.open("/Users/C_Man/Desktop/Thesis/2DPanelCode/11pts.txt");
-    
-    int fline;
-    thefile >> fline;
-    numpts = fline;
-    
-    double xpt;
-    double ypt;
-    
-    int count = 0;
-    while(thefile >> xpt >> ypt){
-        x[count] = xpt;
-        y[count] = ypt;
-        count++;
-    }
-    thefile.close();
-}
-
-void findSigma(const double &AoA, VectorXd &theta, VectorXd &sigma, int &n, double Qinf){
-    for(int i = 0; i < n; i++){
-        sigma[i] = Qinf*(cos(AoA)*sin(theta[i]) - sin(AoA)*cos(theta[i]));
-    }
-}
-
-void findPhiSource(double &sigma, double &px, double &py, double &x1, double &y1, double &x2, double &y2, double &phiS ){
-    
-    phiS = (sigma/(4*pi))*((px-x1)*log(pow(px-x1,2)+pow(py,2)) - (px-x2)*log(pow(px-x2,2) + pow(py,2)) + 2*py*(atan2(py,(px-x2)) - atan2(py,(px-x1))));
-}
-
-void findPhiDoublet(double &mu, double &px, double &py, double &x1, double &y1, double &x2, double &y2, double &phiD){
-    
-    phiD = (-mu/(2*pi))*(atan2(py,(px-x2)) - atan2(py,(px-x1)));
-}
-
-void InfluenceCoeffs(VectorXd &x, VectorXd &y, VectorXd &xControlPt, VectorXd &yControlPt, MatrixXd &A, int &n, MatrixXd &c, VectorXd &theta, MatrixXd &b,VectorXd &dl){
-    
-    
-    // Populate matrix
-    for(int i = 0; i < n; i++){
-        for(int j = 0; j < n; j++){
-            
-            // Doublet influence coeff
-            double phiD;
-            double phiS;
-            double mu = 1;
-            double sig = 1;
-            
-            // Converting everything to local coords
-            double xt = xControlPt(i) - x(j);
-            double yt = yControlPt(i) - y(j);
-            double dx= x(j+1) - x(j);
-            double dy= y(j+1) - y(j);
-            
-            double px = xt*cos(theta(j)) + yt*sin(theta(j));
-            double py = -xt*sin(theta(j))+ yt*cos(theta(j));
-            double x2 = sqrt(dx*dx + dy*dy);
-            // dl(j) = x2;
-            
-            double y2 = 0;
-            double x1 = 0;
-            double y1 = 0;
-            
-            
-            
-            if(i==j){
-                c(i,i) = 0.5;
-            }else{
-                findPhiDoublet(mu,px,py,x1,y1,x2,y2,phiD);
-                c(i,j) = phiD;
-            }
-            
-            findPhiSource(sig,px,py,x1,y1,x2,y2,phiS);
-            b(i,j) = phiS;
-            
-        }
-        
-        // Add wake influence coeff.
-        double mu = 1;
-        double phiD;
-        
-        // Converting everything to local coords
-        double xt = xControlPt(i) - x(n);
-        double yt = yControlPt(i) - y(n);
-        
-        double px = xt*cos(0) + yt*sin(0);
-        double py = -xt*sin(0)+ yt*cos(0);
-        double x2 = numeric_limits<double>::infinity();
-        double y2 = 0;
-        double x1 = 0;
-        double y1 = 0;
-        
-        findPhiDoublet(mu,px,py,x1,y1,x2,y2,phiD);
-        c(i,n) = phiD; //This is returning same value as book func
-        
-    }
-    // new wake panel takes out all circulation? or lift?
-    // Explicit Kutta condition: Since the condition requires circulation at TE = 0, a wake panel is added which extends to x = inf.  (mu_1 - mu_N) + mu_w = 0. This is included in the numpans+1 column because the wake doublet is added onto the numpans+1 row.
-    c(n,0) = 1;
-    c(n,n-1) = -1;
-    c(n, n) = 1;
-    
-    // Reducing the c matrix from an n+1 by n+1 matrix to an n by n matrix called A.
-    //     a(i,1) = c(i,1) - c(i,n+1)
-    //     a(i,n) = c(i,n) + c(i,n+1)
-    
-    for(int i = 0; i < n; i++){
-        for(int j = 0; j < n; j++){
-            if(j == 0){
-                A(i,0) = c(i,0) - c(i,n);
-            }else if(j == n-1){
-                A(i,n-1) = c(i,n-1) + c(i,n);
-            }else{
-                A(i,j) = c(i,j);
-            }
-        }
-    }
-    
-}
+const double pi = 3.141592653589;
 
 
 int main()
 {
-    const double Qinf = 10;
-    const double alpha = 5/57.2958;
-    int numpts = 161;
-    VectorXd x(numpts);
-    VectorXd y(numpts);
-    getCoords(x, y, numpts);
-    int n;
-    n = numpts-1;
+    const double Qinf = 1;
+    const double alpha = 0/57.2958;
+    MatrixXd coords(1,2);
     
     
+    Geom object;
+    string file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/4412.txt";
+    object.getCoords(coords, file_name);
+    int n = coords.rows()-1;
+
     // Find control points, panel lengths, and panel angles
-    VectorXd xControlPt(n);
-    VectorXd yControlPt(n);
+    MatrixXd controlPts(n,2);
     VectorXd dl(n);
     VectorXd theta(n);
 
-    Geom object;
-    object.findControlPts(x, y, xControlPt, yControlPt, dl, n);
-    object.calcPanelAngles(x, y, theta, n);
+    object.findControlPts(coords, controlPts, dl);
+    object.calcPanelAngles(coords, theta);
     
     // Find source strength
     VectorXd sigma(n);
-    findSigma(alpha, theta, sigma, n, Qinf);
+    SourceDoublet object2;
+    object2.findSigma(alpha, theta, sigma, Qinf);
     
     
     // Find Doublet coefficient matrix
     MatrixXd A(n,n);
     MatrixXd c(n+1,n+1);
     MatrixXd b(n,n);
-    
-    InfluenceCoeffs(x, y, xControlPt, yControlPt, A, n, c, theta, b, dl);
+
+    object2.InfluenceCoeffs(coords, controlPts, A, c, theta, b, dl);
     
     // Find right had side vector and solve
     VectorXd RHS(n);
     RHS = -b*sigma;
     VectorXd mu = A.colPivHouseholderQr().solve(RHS);
+
+
+// ---------------------------------------------Wake---------------------------------------------//
+    //First time through. No loop yet.
+
+    // RHS2 = -b*sigma - Cvec*wakedoublet - d*vortex parts;
+    // RHS2 =   RHS    -        C         -       D
+/*
     
+    
+    // Finding strength and size of wake doublet panel.
+    double c_w = 0.3;
+    double dt = .1;
+    int timesteps = 2;
+    int n_part = timesteps-1;
+    
+    Vector3d bufferWake2; // Vector containing [x1,x2,mu].
+    bufferWake2(0) = coords(0,0) + c_w*Qinf*dt; // trailing edge plus the length of the first panel.
+    bufferWake2(1) = bufferWake2(0) + Qinf*dt; // x2
+    bufferWake2(2) = mu(n-1)-mu(0); // Eq. 11.36. mu1 - mu_n + mu_w = 0
+    
+    
+    
+    // Influence of wake panel onto body
+    VectorXd C(n);
+    Wake time2;
+    time2.wake2influence(bufferWake2, C, controlPts);
+
+    
+    // Particle strength
+    MatrixXd particles(n_part,3); // (x,y,strength)
+    particles(0,0) = bufferWake2(0);
+    particles(0,1) = bufferWake2(1);
+    particles(0,2) = bufferWake2(2);
+
+    
+    
+    
+    // Velocity influence on particles from particles
+    //      U_inf + part_to_part + pan_to_part       
+    
+    
+    
+    // Body velocity influence on particles ===> From the velocity infl. written before
+    MatrixXd bodyInflonParts(n_part,2);
+    
+    
+    
+    
+    
+    
+    
+    // Potential influence from particles onto body
+    VectorXd D(n); // The vector with the sum of particle strengths on each panel.
+    time2.PartToPanInfluence(particles, controlPts, D);
+    
+    
+    
+    
+    
+    
+    
+    // time2.part_strength //influence from body as well as vortex damping.
+    // time2.trackpart
+    
+    
+    //time2.part influence
+    
+
+    VectorXd RHS2(n);
+   // RHS2 = -b*sigma - c*wakedoublet - d*vortex parts;
+*/
+    
+ 
+
+
+   //---------------------------------------------------------------------------------------------------------
     
     // Calc tangential Q_inf
     VectorXd QinfTan(n);
     for(int i =0 ; i < n; i++){
         QinfTan(i) = Qinf*(cos(alpha)*cos(theta(i))+sin(alpha)*sin(theta(i)));
     }
-    
     // Calc tangential velocity
     VectorXd Qtan(n);
     for(int i =0 ; i < n-1; i++){
-        Qtan(i) = (mu(i)-mu(i+1))/dl(i) + QinfTan(i);
+        Qtan(i) = ((mu(i)-mu(i+1))/dl(i)*Qinf + QinfTan(i));
     }
-    Qtan(n-1) = (mu(n-2)-mu(n-1))/dl(n-1) + QinfTan(n-1); // Backwards differencing the nth panel is same as forward differencing the nth-1 panel.
+    Qtan(n-1) = ((mu(n-2)-mu(n-1))/dl(n-1)*Qinf + QinfTan(n-1)); // Backwards differencing the nth panel is same as forward differencing the nth-1 panel.
     
+
     
     // Calc Cp
     VectorXd Cp(n);
     for (int i = 0; i < n; i++){
-        Cp(i) = 1- Qtan(i)*Qtan(i);
+        Cp(i) = 1- Qtan(i)*Qtan(i)/(Qinf*Qinf);
     }
-    
     
     // Calc Coefficients
     VectorXd delCl(n);
@@ -215,338 +165,112 @@ int main()
     for (int i = 0; i < n; i++){
         delCl(i) = -Cp(i)*dl(i)*cos(theta(i))/1;
         delCd(i) = -Cp(i)*dl(i)*sin(theta(i))/1;
-        delCm(i) = -delCl(i)*(xControlPt(i)-.25) + delCd(i)*yControlPt(i);
+        delCm(i) = -delCl(i)*(controlPts(i,0)-.25) + delCd(i)*controlPts(i,1);
         
     }
     
     cout << "Cl = " << delCl.sum() << endl;
     cout << "Cd = " << delCd.sum() << endl;
     // cout <<"Cm25 = "<< delCm.sum() << endl;
-    
-    
-    
-    
-    /////////////////////////////////////////////////// Grid calcs
-    
-    ifstream myfile;
-    //myfile.open("/Users/C_Man/Desktop/Thesis/2DPanelCode/SixteenGridSmall.txt");
-    //myfile.open("/Users/C_Man/Desktop/Thesis/2DPanelCode/NineHundredGrid.txt");
-    myfile.open("/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt");
-    //myfile.open("/Users/C_Man/Desktop/Thesis/2DPanelCode/4412.txt");
-    
-    
-    int f1line;
-    int num;
-    myfile >> f1line;
-    num = f1line;
-    
-    double xptg;
-    double yptg;
-    VectorXd xg(num);
-    VectorXd yg(num);
-    
-    
-    int count = 0;
-    while(myfile >> xptg >> yptg){
-        xg[count] = xptg;
-        yg[count] = yptg;
-        count++;
-    }
-    
-    myfile.close();
-    
-    
-    MatrixXd u_p(num,n+1);
-    MatrixXd w_p(num,n+1);
-    MatrixXd uvec(num,n+1);
-    MatrixXd wvec(num,n+1);
-    MatrixXd uvectemp(num,n+1);
-    MatrixXd wvectemp(num,n+1);
+
+
+//--------------------------------------------Grid calcs------------------------------------------//
+
+//file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/SixteenGridSmall.txt";
+file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
 
     
-    // Wake Panel Addition
-    mu.conservativeResize(n+1);
-    mu(n) = mu(n-1)-mu(0);
+    MatrixXd gridCoords(1,2);
+    Geom gobject;
+    gobject.getCoords(gridCoords, file_name);
     
-    // calc strengths for a random point
-    for(int i = 0; i < num; i++){
-        for(int j = 0; j < n+1; j++){
-            double xt; double yt; double dx; double dy; double px; double py; double x2; double y2; double x1; double y1;
+    MatrixXd u_global(gridCoords.rows(),n+1);
+    MatrixXd w_global(gridCoords.rows(),n+1);
+    double u_local;
+    double w_local;
+    
+    n = n+1; //now including wake panel.
+    theta.conservativeResize(n);
+    theta(n-1) = 0; //Wake panel is flat and fixed for now
+    mu.conservativeResize(n);
+    mu(n-1) = mu(n-2)-mu(0); // Kutta condition eq. 11.36
+    
+    
+    for(int i = 0; i < gridCoords.rows(); i++){
+        for(int j = 0; j < n; j++){ //n is panels including wake panel
+            
+            if (j < n-1){
+                // Converting grid and control points to panel coords.
+                double xt = gridCoords(i,0) - coords(j,0);
+                double yt = gridCoords(i,1) - coords(j,1);
+                double dx = coords(j+1,0) - coords(j,0);
+                double dy = coords(j+1,1) - coords(j,1);
+                
+                double x = xt*cos(theta(j)) + yt*sin(theta(j));
+                double z = xt*-sin(theta(j))+ yt*cos(theta(j));
 
-            if (j < n){
-                // Converting everything to local coords
-                xt = xg(i) - x(j);
-                yt = yg(i) - y(j);
-                dx = x(j+1) - x(j);
-                dy = y(j+1) - y(j);
+                double x2 = sqrt(dx*dx + dy*dy);
+                double x1 = 0;
+               
+                double dif = atan2(z,(x-x2)) - atan2(z,(x-x1)); //theta2-theta1
+                double val;
+
+                if(dif < -pi){
+                    val = dif + 2*pi;
+                }else if(dif > pi){
+                    val = dif-2*pi;
+                }else{
+                    val = dif;
+                }
                 
-                px = xt*cos(theta(j)) + yt*sin(theta(j));
-                py = -xt*sin(theta(j))+ yt*cos(theta(j));
-                
-                x2 = sqrt(dx*dx + dy*dy);
-                y2 = 0;
-                x1 = 0;
-                y1 = 0;
-                
-                u_p(i,j) = (-mu(j)/(2*pi))*(py/(pow(px-x1,2)+py*py) - py/(pow(px-x2,2)+py*py)) + (sigma(j)/(4*pi))*log((pow(px-x1,2)+py*py)/(pow(px-x2,2)+py*py));
-                
-                w_p(i,j) = (mu(j)/(2*pi))*((px-x1)/(pow(px-x1,2)+py*py) - (px-x2)/(pow(px-x2,2) + py*py)) + sigma(j)/(2*pi)*(atan2(py,(px-x2))-atan2(py,px-x1));
+                // In book on page 236 and 281, the signs of u and w are switched.
+                u_local = (-mu(j)/(2*pi))*(z/(pow(x-x1,2) + z*z) - z/(pow(x-x2,2) + z*z)) + (sigma(j)/(4*pi))*log((pow(x-x1,2) + z*z)/(pow(x-x2,2) + z*z));
+                w_local = (mu(j)/(2*pi))*((x-x1)/(pow(x-x1,2) + z*z) - (x-x2)/(pow(x-x2,2) + z*z)) + (sigma(j)/(2*pi))*(val);
+
             }else{
-                xt = xg(i) - x(j);
-                yt = yg(i) - y(j);
-                dx=  numeric_limits<double>::infinity() - x(j);
-                dy= 0 - y(j);
-                count = count+1;
-                px = xt*cos(0) + yt*sin(0);
-                py = -xt*sin(0)+ yt*cos(0);
+
+                // Add wake panel
+                double xt = gridCoords(i,0) - coords(j,0);
+                double yt = gridCoords(i,1) - coords(j,1);
                 
-                x2 = sqrt(dx*dx + dy*dy);
-                y2 = 0;
-                x1 = 0;
-                y1 = 0;
-                //cout << mu(j) << "  " << py << "  " << px << "  " << x1 << "  " << x2 << endl;
-                //Wake panel is only doublet. I think
-                u_p(i,j) = (-mu(j)/(2*pi))*(py/(pow(px-x1,2)+py*py));
-                w_p(i,j) = (mu(j)/(2*pi))*((px-x1)/(pow(px-x1,2)+py*py));
+                double x = xt*cos(theta(j)) + yt*sin(theta(j));
+                double z = xt*sin(theta(j))+ yt*cos(theta(j));
+                
+                double x1 = 0;
+                
+                u_local = (-mu(j)/(2*pi))*(z/(pow(x-x1,2) + z*z));
+                w_local = (mu(j)/(2*pi))*((x-x1)/(pow(x-x1,2) + z*z));
+
             }
-
-            uvectemp(i,j) = u_p(i,j)*(cos(alpha) - sin(alpha));
-            wvectemp(i,j) = w_p(i,j)*(sin(alpha) + cos(alpha));
-
+            
+// Transform every velocity into global coords. Transformation 11.23 & 11.23a on pp.277. These equations look to be labeled backwards from what I derive. I use my derived version in earlier code. Example code in the appendix pp. 555 uses negative thetas which, using trig identities, is equivalent to my version.
+            u_global(i,j) = u_local*cos(theta(j)) - w_local*sin(theta(j));
+            w_global(i,j) = u_local*sin(theta(j)) + w_local*cos(theta(j));
         }
     }
     
-    for(int i = 0; i< num;i++){         //sum the influences on point from each panel
-        uvec(i) = uvectemp.row(i).sum();
-        wvec(i) = wvectemp.row(i).sum();
-    }
-
-    cout << "VelGrid = [";
-    for(int i = 0; i<num; i++){
-        cout << xg(i) << "," << yg(i) << "," << uvec(i) << "," << wvec(i);
-        if(i < num-1){
-            cout << ";";
-        }
-    }
-    cout << "];%";
-  
+    VectorXd uvec(gridCoords.rows());
+    VectorXd wvec(gridCoords.rows());
+    uvec = u_global.rowwise().sum() + MatrixXd::Ones(gridCoords.rows(),1)*Qinf ;
+    wvec = w_global.rowwise().sum();
     
-    
-    
-    
-    
-    
-    //----------------------------------------WAKE PANEL----------------------------------------------//
-    
-    
-    double WakePanelc = 0.3;
-    double TimeStep = 1;
-    double WakePanelLength = WakePanelc*Qinf*TimeStep;
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    //MATLAB output
-    MATLABoutput(x,y,alpha,xControlPt,yControlPt,theta,numpts,n,A,b,c,dl,Qtan,QinfTan,delCl,mu,RHS,Cp,sigma);
-    
-}
 
 
+ 
+    
+    
+    
+    
+    
+MatlabOutput object3;
+object3.print(coords,alpha, controlPts, theta, n, A, b, c, dl, Qtan, QinfTan, delCl, mu, RHS, Cp, sigma);
+object3.GridPrint(gridCoords, uvec, wvec);
+    
+    
 
-
-void MATLABoutput(VectorXd &x, VectorXd &y, const double &alpha, VectorXd &xControlPt, VectorXd &yControlPt, VectorXd &theta, int &numpts, int &n, MatrixXd &A, MatrixXd &b, MatrixXd &c, VectorXd &dl, VectorXd &Qtan, VectorXd &QinfTan, VectorXd &delCl,  VectorXd &mu, VectorXd &RHS,VectorXd &Cp, VectorXd &sigma){
-    
-    cout << /*"clear all; close all;*/ "format compact;" << endl;
-    cout << "alpha = " << alpha*57.2958 << ";"<< endl;
-    cout << "x = [";
-    
-    for(int i = 0; i < n+1; i++){
-        cout << x[i] << ",";
-    }
-    cout << "];" << endl;
-    
-    cout << "y = [";
-    for(int i = 0; i < n+1; i++){
-        cout << y[i] << ",";
-    }
-    cout << "];" << endl;
-    
-    cout << "xControlPt = [";
-    for(int i = 0; i < n; i++){
-        cout << xControlPt[i] << ",";
-    }
-    cout << "];" << endl;
-    
-    cout << "yControlPt = [";
-    for(int i = 0; i < n; i++){
-        cout << yControlPt[i] << ",";
-    }
-    cout << "];" << endl;
-    
-    cout << "theta = [";
-    for(int i = 0; i < n; i++){
-        cout << theta[i] << ",";
-    }
-    cout << "];" << endl;
-    
-    /*    cout << "beta = [";
-     for(int i = 0; i < n; i++){
-     for (int j = 0; j < n; j++){
-     cout << beta(i,j) << " ";
-     }
-     if(i < n-1){
-     cout << ";";
-     
-     }
-     
-     }
-     cout << "];"<< endl;*/
-    
-    cout << "A = [";
-    for(int i = 0; i < n; i++){
-        for (int j = 0; j < n; j++){
-            cout << A(i,j) << " ";
-        }
-        if(i < n){
-            cout << ";";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "b = [";
-    for(int i = 0; i < n; i++){
-        for (int j = 0; j < n; j++){
-            cout << b(i,j) << " ";
-        }
-        if(i < n){
-            cout << ";";
-        }
-    }
-    cout << "];" << endl;
     
     
-    cout << "c = [";
-    for(int i = 0; i < n+1; i++){
-        for (int j = 0; j < n+1; j++){
-            cout << c(i,j) << " ";
-        }
-        if(i < n){
-            cout << ";";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "dl = [";
-    for(int i = 0; i < n; i++){
-        cout << dl[i];
-        if(i < n){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "Qtan = [";
-    for(int i = 0; i < n; i++){
-        cout << Qtan[i];
-        if(i < n-1){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "QinfTan = [";
-    for(int i = 0; i < n; i++){
-        cout << QinfTan[i];
-        if(i < n-1){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "delCl = [";
-    for(int i = 0; i < n; i++){
-        cout << delCl[i];
-        if(i < n-1){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    /*  cout << "radius = [";
-     for(int i = 0; i < n; i++){
-     for (int j = 0; j < n+1; j++){
-     cout << radius(i,j) << " ";
-     }
-     if(i < n){
-     cout << ";";
-     }
-     }
-     cout << "];" << endl;*/
-    
-    cout << "mu = [";
-    for(int i = 0; i < n+1; i++){
-        cout << mu[i];
-        if(i < n){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "RHS = [";
-    for(int i = 0; i < n; i++){
-        cout << RHS[i];
-        if(i < n-1){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "Cp = [";
-    for(int i = 0; i < n; i++){
-        cout << Cp[i];
-        if(i < n-1){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    cout << "sigma = [";
-    for(int i = 0; i < n; i++){
-        cout << sigma[i];
-        if(i < n-1){
-            cout << ",";
-        }
-    }
-    cout << "];" << endl;
-    
-    /*  cout << "figure" << endl;
-     cout << "plot(x,y)" << endl;
-     cout << "axis([-.2 1 -1 1.5]);" << endl;
-     cout << "figure" << endl;*/
-    cout << "plot(xControlPt,Cp);" << endl;
-    cout << "set(gca,'ydir','reverse')" << endl;
-    cout << "xlabel('X');" << endl;
-    cout << "ylabel('Cp')" << endl;
-    cout << "axis([-.2 1.2 -2 1])" << endl;
-
-    cout << "% ";
+cout << "%";
 }
 
 
@@ -558,6 +282,130 @@ void MATLABoutput(VectorXd &x, VectorXd &y, const double &alpha, VectorXd &xCont
 
 
 
+/*
+ 
+ //--------------------------------------------panel test------------------------------------------//
+ 
+ file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NineHundredGrid.txt";
+ //file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
+ 
+ 
+ 
+ MatrixXd gridCoords(1,2);
+ Geom gobject;
+ gobject.getCoords(gridCoords, file_name);
+ 
+ MatrixXd u_global(gridCoords.rows(),n+1);
+ MatrixXd w_global(gridCoords.rows(),n+1);
+ double u_local;
+ double w_local;
+ 
+ n = 1; //now including the last panel.
+ 
+ double thet = 0;
+ double mu2 = 1;
+ double sig2 = 0;
+ 
+ 
+ 
+ for(int i = 0; i < gridCoords.rows(); i++){
+ for(int j = 0; j < n; j++){ //n is panels including wake panel
+ 
+ 
+ // Converting grid and control points to panel coords.
+ double xt = gridCoords(i,0) - 0;
+ double yt = gridCoords(i,1) - 0;
+ double dx = 1 - 0;
+ double dy = 0;
+ 
+ double x = xt*cos(thet) + yt*sin(thet);
+ double z = xt*-sin(thet)+ yt*cos(thet);
+ 
+ double x2 = sqrt(dx*dx + dy*dy);
+ double x1 = 0;
+ 
+ double dif = atan2(z,(x-x2)) - atan2(z,(x-x1));
+ double val;
+ 
+ if(dif < -pi){
+ val = dif + 2*pi;
+ }else if(dif > pi){
+ val = dif-2*pi;
+ }else{
+ val = dif;
+ }
+ 
+ 
+ // Book is confusing. on page 236 and 281, the signs of u and w are switched?? eq. 10.29
+ u_local = (-mu2/(2*pi))*(z/(pow(x-x1,2) + z*z) - z/(pow(x-x2,2) + z*z)) + (sig2/(4*pi))*log((pow(x-x1,2) + z*z)/(pow(x-x2,2) + z*z));
+ 
+ w_local = (mu2/(2*pi))*((x-x1)/(pow(x-x1,2) + z*z) - (x-x2)/(pow(x-x2,2) + z*z)) + (sig2/(2*pi))*(val);
+ 
+ 
+ 
+ // Transform every velocity into global coords. Transformation 11.23 & 11.23a on pp.277. These equations look to be labeled backwards from what I derive. I use my derived version in earlier code. Example code in the appendix pp. 555 uses negative thetas which, using trig identities, is equivalent to my version.
+ u_global(i,j) = u_local*cos(thet) - w_local*sin(thet);
+ w_global(i,j) = u_local*sin(thet) + w_local*cos(thet);
+ }
+ }
+ 
+ VectorXd uvec(gridCoords.rows());
+ VectorXd wvec(gridCoords.rows());
+ uvec = u_global.rowwise().sum();
+ wvec = w_global.rowwise().sum();
+
+ 
+ //-----------------------------------------------------end---------------------------------------//
+ 
+ 
+ 
+ 
+ cout << "u_global = [";
+ for(int i = 0; i < u_global.rows(); i++){
+ for (int j = 0; j < u_global.cols(); j++){
+ cout << u_global(i,j) << " ";
+ }
+ if(i < u_global.rows()){
+ cout << ";";
+ }
+ }
+ cout << "];" << endl;
+ 
+ 
+ cout << "w_global = [";
+ for(int i = 0; i < w_global.rows(); i++){
+ for (int j = 0; j < w_global.cols(); j++){
+ cout << w_global(i,j) << " ";
+ }
+ if(i < w_global.rows()){
+ cout << ";";
+ }
+ }
+ cout << "];" << endl;
+ 
+ 
 
 
+
+
+
+ VectorXd sigInfUtot(gridCoords.rows());
+ VectorXd sigInfWtot(gridCoords.rows());
+
+ sigInfUtot = sigInfU.rowwise().sum();
+ sigInfWtot = sigInfW.rowwise().sum();
+ 
+ 
+ 
+ cout << "SourceInf = [";
+ for(int i = 0; i< gridCoords.rows(); i++){
+ cout << sigInfUtot(i) << "," << sigInfUtot(i);
+ if(i < gridCoords.rows()){
+ cout << ";";
+ }
+ }
+ cout << "];" <<endl;
+ 
+
+ */
 

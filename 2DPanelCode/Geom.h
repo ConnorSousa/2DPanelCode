@@ -6,14 +6,18 @@
 #include <iostream>
 #include <cmath>
 #include <Eigen/Dense>
+#include <string>
+
 
 using namespace Eigen;
-//Hello
+
 class Geom{
 public:
-    void findControlPts(VectorXd &x, VectorXd &y, VectorXd &xControlPt, VectorXd &yControlPt, VectorXd &dl, int &n);
+    void getCoords(MatrixXd &coords, std::string &file_name);
     
-    void calcPanelAngles(VectorXd &x, VectorXd &y, VectorXd &theta, int &n);
+    void findControlPts(MatrixXd &coords, MatrixXd &controlPts, VectorXd &dl);
+    
+    void calcPanelAngles(MatrixXd &coords, VectorXd &theta);
 };
 
 
