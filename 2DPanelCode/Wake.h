@@ -18,11 +18,16 @@ using namespace Eigen;
 class Wake{
 public:
     
-    void wake2influence(Vector3d bufferWake2, VectorXd Cvec, MatrixXd controlPts);
+    void wake2panInfl(Vector3d &wakePan1, Vector3d &wakePan2, VectorXd &Cvec, MatrixXd &controlPts);
     
-    void PartToPanInfluence(MatrixXd particles, MatrixXd controlPts, VectorXd D);
+    void PartToPanInfluence(MatrixXd &particles, MatrixXd &controlPts, VectorXd &D);
 
+    void PartInflonPart(MatrixXd &part2partVel, MatrixXd &particles);
     
+    void wake2partVel(Vector3d &wakePan1, Vector3d &wakePan2, MatrixXd &particles, MatrixXd &wake2part);
+
+    void panInflonPart(MatrixXd &coords, VectorXd &theta, VectorXd &sigma, VectorXd &mu, MatrixXd &particles);
+
 };
 
 #endif /* defined(___DPanelCode__Wake__) */

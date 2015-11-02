@@ -25,7 +25,7 @@ const double pi = 3.141592653589;
 int main()
 {
     const double Qinf = 1;
-    const double alpha = 0/57.2958;
+    const double alpha = 5/57.2958;
     MatrixXd coords(1,2);
     
     
@@ -60,88 +60,130 @@ int main()
     RHS = -b*sigma;
     VectorXd mu = A.colPivHouseholderQr().solve(RHS);
 
-
-// ---------------------------------------------Wake---------------------------------------------//
+// ---------------------------------------------CREATING WAKE PANELS---------------------------------------------//
     //First time through. No loop yet.
 
-    // RHS2 = -b*sigma - Cvec*wakedoublet - d*vortex parts;
-    // RHS2 =   RHS    -        C         -       D
-/*
+    //   RHS2 = -b*sigma - Cvec*BufferWake;
+    //   RHS2 =  (1)RHS  -      (2)C
+
     
-    
-    // Finding strength and size of wake doublet panel.
+ 
+   //Buffer Wake
     double c_w = 0.3;
     double dt = .1;
-    int timesteps = 2;
-    int n_part = timesteps-1;
     
-    Vector3d bufferWake2; // Vector containing [x1,x2,mu].
-    bufferWake2(0) = coords(0,0) + c_w*Qinf*dt; // trailing edge plus the length of the first panel.
-    bufferWake2(1) = bufferWake2(0) + Qinf*dt; // x2
-    bufferWake2(2) = mu(n-1)-mu(0); // Eq. 11.36. mu1 - mu_n + mu_w = 0
+    // 2nd wake panel // where should 1st be?
+    Vector3d wakePan1; // Vectors containing [x1,x2,]
+    wakePan1(0) = coords(0,0);
+    wakePan1(1) = wakePan1(0) + c_w*Qinf*dt;
+    wakePan1(2) = mu(n-1)-mu(0);
     
+    Vector3d wakePan2; // [x1,x2,mu]
+    wakePan2(0) = wakePan1(1); // trailing edge plus the length of the first panel.
+    wakePan2(1) = wakePan2(0) + Qinf*dt; // x2
+    wakePan2(2) = 0; // Zero strength means zero influence. This is just so I don't need to write another function that doesn't include the infl of the second panel
+    
+    // Influence of wake panel onto body
+    VectorXd C(n);
+    Wake time2;
+    time2.wake2panInfl(wakePan1, wakePan2, C, controlPts);
+
+
+    VectorXd RHS2(n);
+    RHS2 = -b*sigma - C;
+    mu = A.colPivHouseholderQr().solve(RHS2);
+    
+ 
+//----------------------------------------------------Plus Particles--------------------------------------------------------------
+
+    // RHS3 = -b*sigma - Cvec*BufferWake - d*vortex parts;
+    // RHS3 = (1)RHS3  -      (2)C        -     (3)D
+    ///*
+    
+///*
+    int n_part;
+   
+    // First pan
+    wakePan2(2) = wakePan1(2); // Eq. 11.36. mu1 - mu_n + mu_w = 0
+    
+    wakePan1(0) = coords(0,0);
+    wakePan1(1) = wakePan1(0) + c_w*Qinf*dt;
+    wakePan1(2) = mu(n-1)-mu(0);
+
+
     
     
     // Influence of wake panel onto body
     VectorXd C(n);
     Wake time2;
-    time2.wake2influence(bufferWake2, C, controlPts);
-
+    time2.wake2influence(wakePan2, C, controlPts);
+//% Where does the first panel's influence come into play?
     
-    // Particle strength
+    // Influence of particles onto body
+    // Velocity influence on particles
+    //     U_inf + part_to_part + pan_to_part + wake_to_part
+    
     MatrixXd particles(n_part,3); // (x,y,strength)
-    particles(0,0) = bufferWake2(0);
-    particles(0,1) = bufferWake2(1);
-    particles(0,2) = bufferWake2(2);
-
     
+    // New particle
+    n_part = n_part+1; // (x,y,strength)
+    particles.conservativeResize(n_part);
+    particles(n_part-1,0) = wakePan2(0); // new particle goes at the end of the matrix so no data shifting is required.
+    particles(n_part-1,1) = wakePan2(1);
+    particles(n_part-1,2) = wakePan2(2);
     
+    // Particle velocity and location
+    // Uinf Velocity
+    MatrixXd UinfVel(n_part,2);
+    UinfVel.col(0) = Qinf*VectorXd::Ones(n_part);
+    UinfVel.col(1) = VectorXd::Zero(n_part);
     
-    // Velocity influence on particles from particles
-    //      U_inf + part_to_part + pan_to_part       
-    
-    
+    // Particle to Particle
+    MatrixXd part2partVel(n_part,2); // Matrix containing [du0,dw0;du1,dw1]
+    time2.PartInflonPart(part2partVel, particles);
     
     // Body velocity influence on particles ===> From the velocity infl. written before
-    MatrixXd bodyInflonParts(n_part,2);
+    MatrixXd pan2partVel(n_part,2);
+    time2.panInflonPart(controlPts, theta, sigma, mu, particles);
     
+    // Wake infl on particles
+    MatrixXd wake2part(n_part,2);
+    time2.wake2partVel(wakePan1, wakePan2, particles, wake2part);
     
+    // Add these influences
+    MatrixXd partVel(n_part,2);
+    partVel = UinfVel + part2partVel + pan2partVel + wake2part;
     
-    
-    
+    // Take a time step and track these particles.
+    for(int i = 0; i<particles.rows();i++){
+        particles(i,0) = particles(i,0) + partVel(i,0)*dt;
+        particles(i,1) = particles(i,1) + partVel(i,0)*dt;
+    };
     
     
     // Potential influence from particles onto body
     VectorXd D(n); // The vector with the sum of particle strengths on each panel.
     time2.PartToPanInfluence(particles, controlPts, D);
     
+    //% start loop here?
+    VectorXd RHS3(n);
+    RHS2 = -b*sigma - C - D;
+    mu = A.colPivHouseholderQr().solve(RHS3);
     
     
     
-    
-    
-    
-    // time2.part_strength //influence from body as well as vortex damping.
-    // time2.trackpart
-    
-    
-    //time2.part influence
-    
+ //   */
 
-    VectorXd RHS2(n);
-   // RHS2 = -b*sigma - c*wakedoublet - d*vortex parts;
-*/
     
- 
-
-
-   //---------------------------------------------------------------------------------------------------------
+    
+   //------------------------------------------------POST PROCESS--------------------------------------------------------------
     
     // Calc tangential Q_inf
     VectorXd QinfTan(n);
     for(int i =0 ; i < n; i++){
         QinfTan(i) = Qinf*(cos(alpha)*cos(theta(i))+sin(alpha)*sin(theta(i)));
     }
+    
     // Calc tangential velocity
     VectorXd Qtan(n);
     for(int i =0 ; i < n-1; i++){
@@ -149,7 +191,6 @@ int main()
     }
     Qtan(n-1) = ((mu(n-2)-mu(n-1))/dl(n-1)*Qinf + QinfTan(n-1)); // Backwards differencing the nth panel is same as forward differencing the nth-1 panel.
     
-
     
     // Calc Cp
     VectorXd Cp(n);
@@ -166,7 +207,6 @@ int main()
         delCl(i) = -Cp(i)*dl(i)*cos(theta(i))/1;
         delCd(i) = -Cp(i)*dl(i)*sin(theta(i))/1;
         delCm(i) = -delCl(i)*(controlPts(i,0)-.25) + delCd(i)*controlPts(i,1);
-        
     }
     
     cout << "Cl = " << delCl.sum() << endl;
@@ -175,9 +215,10 @@ int main()
 
 
 //--------------------------------------------Grid calcs------------------------------------------//
-
-//file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/SixteenGridSmall.txt";
-file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
+/*
+file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/SixteenGridSmall.txt";
+//file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
+  //  file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/4412longnear.txt";
 
     
     MatrixXd gridCoords(1,2);
@@ -194,7 +235,6 @@ file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
     theta(n-1) = 0; //Wake panel is flat and fixed for now
     mu.conservativeResize(n);
     mu(n-1) = mu(n-2)-mu(0); // Kutta condition eq. 11.36
-    
     
     for(int i = 0; i < gridCoords.rows(); i++){
         for(int j = 0; j < n; j++){ //n is panels including wake panel
@@ -251,20 +291,20 @@ file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
     
     VectorXd uvec(gridCoords.rows());
     VectorXd wvec(gridCoords.rows());
-    uvec = u_global.rowwise().sum() + MatrixXd::Ones(gridCoords.rows(),1)*Qinf ;
-    wvec = w_global.rowwise().sum();
+    uvec = u_global.rowwise().sum() + VectorXd::Ones(gridCoords.rows())*Qinf*cos(alpha);
+    wvec = w_global.rowwise().sum() + VectorXd::Ones(gridCoords.rows())*Qinf*sin(alpha);
     
 
 
  
     
-    
+    */
     
     
     
 MatlabOutput object3;
-object3.print(coords,alpha, controlPts, theta, n, A, b, c, dl, Qtan, QinfTan, delCl, mu, RHS, Cp, sigma);
-object3.GridPrint(gridCoords, uvec, wvec);
+//object3.print(coords,alpha, controlPts, theta, n, A, b, c, dl, Qtan, QinfTan, delCl, mu, RHS, Cp, sigma);
+//object3.GridPrint(gridCoords, uvec, wvec);
     
     
 
