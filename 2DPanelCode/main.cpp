@@ -15,6 +15,7 @@
 #include "SourceDoublet.h"
 #include "MatlabOutput.h"
 #include "Wake.h"
+#include <iomanip> // to set output precision
 
 using namespace std;
 using namespace Eigen;
@@ -25,7 +26,6 @@ int main()
     const double Qinf = 1;
     const double alpha = 5/57.2958;
     MatrixXd coords(1,2);
-    
     
     Geom geomObj;
     string file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/4412.txt";
@@ -89,7 +89,7 @@ int main()
 //this includes the influence from the second wake panel and then enforces it by the first.
     wakePan1(4) = mu2(n-1)-mu2(0);
     
-    mu = mu2;
+    //mu = mu2;
  
 //===================================================== Plus First Particle ===========================================================
     
@@ -105,10 +105,18 @@ int main()
     particles(0,0) += Qinf*cos(wakeTheta)*dt;
     particles(0,1) += Qinf*sin(wakeTheta)*dt;
 
+    VectorXd D(n);
+    // Potential influence from particles onto body
+    wakeobj.PartToPanInfluence(particles, controlPts, D);
     
+    // Influence of wake panel onto body
+    wakeobj.wake2bodyInfl(wakePan1, wakePan2, C, controlPts);
+    
+    // Saving wake panel strength for next time step
+    wakePan2(4) = wakePan1(4);
 //========================================================= Define stuff =============================================================
 
-    VectorXd D(n); VectorXd RHS3(n); VectorXd mu3(n); MatrixXd UinfVel(n_part,2); MatrixXd pan2partVel(n_part,2);
+    VectorXd RHS3(n); VectorXd mu3(n); MatrixXd UinfVel(n_part,2); MatrixXd pan2partVel(n_part,2);
     MatrixXd wake2part(n_part,2); MatrixXd part2partVel(n_part,2); MatrixXd partVel(n_part,2);
 
 //======================================================== Start the loop =============================================================
@@ -116,51 +124,48 @@ int main()
     // RHS3 =  -b*sigma  -   C*BufferWake  -   d*vortex parts; // source strengths depend only on geom which doesn't change.
     // RHS3 =  (1)RHS3   -      (2)C       -       (3)D
 
-    cout << "figure;";
-    for(int i = 0; i < 4; i++){
-        
-        // Potential influence from particles onto body
-        wakeobj.PartToPanInfluence(particles, controlPts, D);
-        
-        // Influence of wake panel onto body
-        wakeobj.wake2bodyInfl(wakePan1, wakePan2, C, controlPts);
-        
-        // Saving wake panel strength for next time step
-        wakePan2(4) = wakePan1(4);
-        
+    cout << "close all; figure;";
+    for(int i = 0; i < 35; i++){
+
         // Find body panel strengths and first wake panel
         RHS3 = -b*sigma - C - D;
-        mu3 = A.colPivHouseholderQr().solve(RHS3);
-        wakePan1(4) = mu3(n-1)-mu3(0);
+       // mu3 = A.colPivHouseholderQr().solve(RHS3);
+        wakePan1(4) = mu(n-1)-mu(0);
         
         
        // Velocity influence on particles
         // U_inf + pan_to_part + wake_to_part + part_to_part
         
         // Freestream influence including alpha. First particle is influenced from last panel velocity.
-        UinfVel.conservativeResize(n_part,2);
+        UinfVel.resize(n_part,2);
         UinfVel.col(0) = Qinf*VectorXd::Ones(n_part)*cos(alpha);
         UinfVel.col(1) = Qinf*VectorXd::Ones(n_part)*sin(alpha);
         
+        
         // Body velocity influence on particles
-        pan2partVel.conservativeResize(n_part,2);
+        pan2partVel.resize(n_part,2);
         wakeobj.body2partVel(controlPts, theta, sigma, mu, particles,pan2partVel, Qinf);
         
+        
         // Wake to particle velocity
-        wake2part.conservativeResize(n_part,2);
+        wake2part.resize(n_part,2);
         wakeobj.wake2partVel(wakePan1, wakePan2, particles, wake2part, wakeTheta);
         
+        
         // Particle to Particle
-        part2partVel.conservativeResize(n_part,2); // Matrix containing [du0,dw0;du1,dw1]
+        part2partVel.resize(n_part,2); // Matrix containing [du0,dw0;du1,dw1]
         wakeobj.PartInflonPart(part2partVel, particles);
         
-        // Add these influences
-        partVel.conservativeResize(n_part,2);
-        partVel = UinfVel + pan2partVel + wake2part + part2partVel;
         
+        // Add these influences
+        partVel.resize(n_part,2);
+        partVel = UinfVel + pan2partVel + wake2part + part2partVel;
+    
+
         // Convect particles downstream
         particles.col(0) += partVel.col(0)*dt;
         particles.col(1) += partVel.col(1)*dt;
+        
         
         // New particle
         n_part++;
@@ -169,19 +174,32 @@ int main()
         particles(n_part-1,1) = wakePan2(3);
         particles(n_part-1,2) = wakePan2(4);
         
+        
         // Convect new particle downstream using wake vel.
         particles(n_part-1,0) += Qinf*cos(wakeTheta)*dt;
         particles(n_part-1,1) += Qinf*sin(wakeTheta)*dt;
+        
         
         // Matlab visual
         cout << "clf; hold on; plot(coords(:,1),coords(:,2));" << endl;
         for(int z=0; z<n_part; z++){
             cout << "plot(" << particles(z,0) << "," << particles(z,1) << ",'r*');";
         }
-        cout << "hold off;\n title([num2str(" << n_part << ") ' Particles']);  drawnow; pause(1);" << endl; //axis([0 1.5 -.5 .5]);
+        cout << "hold off;\n title([num2str(" << n_part << ") ' Particles']); axis([0 3.5 -1.5 1.5]); drawnow; pause(1/30);" << endl; //;
         
+        
+        // Potential influence from particles onto body
+        wakeobj.PartToPanInfluence(particles, controlPts, D);
+        
+        
+        // Influence of wake panel onto body
+        wakeobj.wake2bodyInfl(wakePan1, wakePan2, C, controlPts);
+        
+        
+        // Saving wake panel strength for next time step
+        wakePan2(4) = wakePan1(4);
     }
-    mu = mu3;
+   // mu = mu3;
  
    //------------------------------------------------POST PROCESS--------------------------------------------------------------
     
@@ -219,18 +237,15 @@ int main()
 
 
 //--------------------------------------------Grid calcs------------------------------------------//
-/*
-//file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/SixteenGridSmall.txt";
-   // file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
+
+   //file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/SixteenGridSmall.txt";
+    file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/NearField.txt";
    // file_name = "/Users/C_Man/Desktop/Thesis/2DPanelCode/4412longnear.txt";
 
  
-  //  MatrixXd gridCoords(1,2);
-  //  Geom gobject;
-  //  gobject.getCoords(gridCoords, file_name);
+    MatrixXd gridCoords(1,2); Geom gobject; gobject.getCoords(gridCoords, file_name);
     
-    MatrixXd gridCoords(controlPts.rows(),2);
-    gridCoords = controlPts;
+   // MatrixXd gridCoords(controlPts.rows(),2); gridCoords = controlPts;
     
     MatrixXd u_global(gridCoords.rows(),n+1);
     MatrixXd w_global(gridCoords.rows(),n+1);
@@ -318,16 +333,26 @@ int main()
     uvec = u_global.rowwise().sum()*Qinf + VectorXd::Ones(gridCoords.rows())*Qinf*cos(alpha);
     wvec = w_global.rowwise().sum()*Qinf + VectorXd::Ones(gridCoords.rows())*Qinf*sin(alpha);
     
-*/
+
 
     
   
     MatlabOutput object3;
     object3.print(coords,alpha, controlPts, theta, n, A, b, c, dl, Qtan, QinfTan, delCl, mu, RHS, Cp, sigma);
     object3.WakePrint(wakePan1, wakePan2, wakeTheta, mu2, C, RHS2, particles, UinfVel, part2partVel, pan2partVel, partVel, D, RHS3, mu3);
-    //object3.GridPrint(gridCoords, uvec, wvec);
+    object3.GridPrint(gridCoords, uvec, wvec);
     
 cout << "%";
 }
-
-
+/*
+cout << "Uinfvel" << i << "(1) = " << UinfVel(i,0) << ";";
+cout << "Uinfvel" << i << "(2) = " << UinfVel(i,1) << ";";
+cout << "part2part" << i << "(1) = " << part2partVel(i,0) << ";";
+cout << "part2part" << i << "(2) = " << part2partVel(i,1) << ";";
+cout << "partvel" << i << "(1) = " << partVel(i,0) << ";";
+cout << "partvel" << i << "(2) = " << partVel(i,1) << ";";
+cout << "wake2part" << i << "(1) = " << wake2part(i,0) << ";";
+cout << "wake2part" << i << "(2) = " << wake2part(i,1) << ";";
+cout << "pan2part" << i << "(1) = " << pan2partVel(i,0) << ";";
+cout << "pan2part" << i << "(2) = " << pan2partVel(i,1) << ";";
+*/

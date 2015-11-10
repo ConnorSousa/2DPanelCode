@@ -8,6 +8,7 @@
 
 #include "MatlabOutput.h"
 #include <Eigen/Dense>
+#include <iomanip>
 
 using namespace Eigen;
 using namespace std;
@@ -15,14 +16,14 @@ using namespace std;
 void MatlabOutput::print(MatrixXd &coords, const double &alpha, MatrixXd &controlPts, VectorXd &theta, int &n, MatrixXd &A, MatrixXd &b, MatrixXd &c, VectorXd &dl, VectorXd &Qtan, VectorXd &QinfTan, VectorXd &delCl,  VectorXd &mu, VectorXd &RHS, VectorXd &Cp, VectorXd &sigma){
     
     
-    cout << "clear all; format compact;" << endl;
+    cout << "format compact;" << endl;
     cout << "alpha = " << alpha*57.2958 << ";"<< endl;
     
     
     cout << "coords = [";
     for(int i = 0; i < coords.rows(); i++){
         for (int j = 0; j < coords.cols(); j++){
-            cout << coords(i,j) << " ";
+            cout << std::setprecision(12) << coords(i,j) << " ";
         }
         if(i < coords.rows()){
             cout << ";";
@@ -33,7 +34,7 @@ void MatlabOutput::print(MatrixXd &coords, const double &alpha, MatrixXd &contro
     cout << "controlPts = [";
     for(int i = 0; i < controlPts.rows(); i++){
         for (int j = 0; j < controlPts.cols(); j++){
-            cout << controlPts(i,j) << " ";
+            cout   << controlPts(i,j) << " ";
         }
         if(i < controlPts.rows()){
             cout << ";";

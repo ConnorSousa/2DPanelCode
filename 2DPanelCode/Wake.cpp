@@ -103,9 +103,9 @@ void Wake::PartInflonPart(MatrixXd &part2partVel, MatrixXd &particles){
                 upart(i,j) = 0;
                 wpart(i,j) = 0;
             }else{
-            upart(i,j) = (particles(j,2)/(2*pi))*((particles(j,1)-particles(i,1))/(pow(particles(j,0)-particles(i,0),2)+pow(particles(j,1)-particles(i,1),2)));
+                upart(i,j) = (particles(j,2)/(2*pi))*((particles(j,1)-particles(i,1))/(pow(particles(j,0)-particles(i,0),2)+pow(particles(j,1)-particles(i,1),2)));
             
-            wpart(i,j) = (-particles(j,2)/(2*pi))*((particles(j,0)-particles(i,0))/(pow(particles(j,0)-particles(i,0),2)+pow(particles(j,1)-particles(i,1),2)));
+                wpart(i,j) = (-particles(j,2)/(2*pi))*((particles(j,0)-particles(i,0))/(pow(particles(j,0)-particles(i,0),2)+pow(particles(j,1)-particles(i,1),2)));
             }
         }
     }
@@ -164,13 +164,13 @@ void Wake::body2partVel(MatrixXd &coords, VectorXd &theta, VectorXd &sigma, Vect
             // In book on page 233-36
             if(abs(z) < 1.0e-9){ // if point is on panel surface, then velocity is different
                 
-                u_local = 0 + (sigma(j)/(2*pi))*log(abs((x-x1)/(x-x2))); // eq. 10.32 & 10.23
-                w_local = (mu(j)/(2*pi))*((1/(x-x1))-(1/(x-x2))) + sigma(j)/2; //eq 10.33 & 10.24
+                u_local = 0;//0 + (sigma(j)/(2*pi))*log(abs((x-x1)/(x-x2))); // eq. 10.32 & 10.23
+                w_local = 0;//(mu(j)/(2*pi))*((1/(x-x1))-(1/(x-x2))) + sigma(j)/2; //eq 10.33 & 10.24
                 
             }else{
                 
-                u_local = (-mu(j)/(2*pi))*(z/(pow(x-x1,2) + z*z) - z/(pow(x-x2,2) + z*z)) + (sigma(j)/(4*pi))*log((pow(x-x1,2) + z*z)/(pow(x-x2,2) + z*z)); // eq 10.29 & 10.20
-                w_local = (mu(j)/(2*pi))*((x-x1)/(pow(x-x1,2) + z*z) - (x-x2)/(pow(x-x2,2) + z*z)) + (sigma(j)/(2*pi))*(val); // eq. 10.30 & 10.21
+                u_local = 0;//(-mu(j)/(2*pi))*(z/(pow(x-x1,2) + z*z) - z/(pow(x-x2,2) + z*z)) + (sigma(j)/(4*pi))*log((pow(x-x1,2) + z*z)/(pow(x-x2,2) + z*z)); // eq 10.29 & 10.20
+                w_local = 0;//(mu(j)/(2*pi))*((x-x1)/(pow(x-x1,2) + z*z) - (x-x2)/(pow(x-x2,2) + z*z)) + (sigma(j)/(2*pi))*(val); // eq. 10.30 & 10.21
             };
             
 
@@ -239,10 +239,11 @@ void Wake::wake2partVel(VectorXd &wakePan1, VectorXd &wakePan2, MatrixXd &partic
             w_local += (wakePan2(4)/(2*pi))*((x-x1)/(pow(x-x1,2) + z*z) - (x-x2)/(pow(x-x2,2) + z*z)); //eq. 10.30
             
         };
+
         
         // Transform every velocity into global coords. Transformation 11.23 & 11.23a on pp.277. These equations look to be labeled backwards from what I derive. I use my derived version in earlier code. Example code in the appendix pp. 555 uses negative thetas which, using trig identities, is equivalent to my version.
-        wake2part(0) = u_local*cos(wakeTheta) - w_local*sin(wakeTheta);
-        wake2part(1) = u_local*sin(wakeTheta) + w_local*cos(wakeTheta);
+        wake2part(i,0) = 0; //u_local*cos(wakeTheta) - w_local*sin(wakeTheta);
+        wake2part(i,1) = 0; //u_local*sin(wakeTheta) + w_local*cos(wakeTheta);
     }
     
 };
