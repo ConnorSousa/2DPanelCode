@@ -18,6 +18,9 @@ public:
     void findControlPts(MatrixXd &coords, MatrixXd &controlPts, VectorXd &dl);
     
     void calcPanelAngles(MatrixXd &coords, VectorXd &theta);
+    
+    void findwakepans(VectorXd &wakePan1, VectorXd &wakePan2, double &c_w, const double &Qinf, MatrixXd &coords, double &dt, double &wakeTheta);
+
 };
 
 

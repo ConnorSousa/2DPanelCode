@@ -64,3 +64,25 @@ void Geom::calcPanelAngles(MatrixXd &coords, VectorXd &theta){
         theta[i] = atan2(dy,dx);
     }
 }
+
+void Geom::findwakepans(VectorXd &wakePan1, VectorXd &wakePan2, double &c_w, const double &Qinf, MatrixXd &coords, double &dt, double &wakeTheta){
+
+    // Find the angle of last and first panel. Find the average and subtract from first panel to find the angle of bisection. Propagate wake to find panel length and coords.
+    
+    //"It is usually sufficient to assume that the wake leaves the trailing edge at a median angle delta/2 as shown in fig 13.2" Katz- pg. 376 Buffer Wake
+
+    double delta1 = atan((coords(coords.rows()-2,1)-coords(0,1))/(coords(coords.rows()-2,0)-coords(0,0)));
+    double delta2 = atan((coords(0,1)-coords(1,1))/(coords(1,0)-coords(0,0)));
+    wakeTheta = delta1-(delta1+delta2)/2;
+    
+    wakePan1(0) = coords(0,0); // Probably going to need some tricky geom logic when dealing with a harder case.
+    wakePan1(1) = coords(0,1);
+    wakePan1(2) = wakePan1(0) + c_w*dt*Qinf*cos(wakeTheta);//wakePan1 x2
+    wakePan1(3) = wakePan1(1) + c_w*dt*Qinf*sin(wakeTheta);//wakePan1 y2
+    
+    wakePan2(0) = wakePan1(2);
+    wakePan2(1) = wakePan1(3);
+    wakePan2(2) = wakePan2(0) + Qinf*dt*cos(wakeTheta);
+    wakePan2(3) = wakePan2(1) + Qinf*dt*sin(wakeTheta);
+    
+}
